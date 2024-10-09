@@ -36,4 +36,73 @@ JSON;
                         AvroSchema::parse($writers_schema),
                         AvroSchema::parse($readers_schema)));
   }
+
+    /**
+     * Infinity loop inside \AvroIOBinaryDecoder::skip_long function on php version < 8.0.0 in forked repo
+     */
+    public function testReadAndWriteDataEquals()
+    {
+        $record = [
+            "id" => 174,
+            "login" => "testLogin",
+            "status" => "active",
+        ];
+        $expectedRecord = [
+            "id" => 174,
+            "login" => "testLogin",
+        ];
+
+        $writers_schema = <<<JSON
+      { 
+        "type": "record",
+        "name": "user",
+        "fields": [
+          {
+            "name": "id", 
+            "type": "int" 
+          },
+          {
+            "name": "login", 
+            "type": "string" 
+          },
+          {
+            "name": "deletedById", 
+            "type": "int",
+            "default": 0
+          }
+        ]
+     }
+JSON;
+
+        $readers_schema = <<<JSON
+      { 
+        "type": "record",
+        "name": "user",
+        "fields": [
+          {
+            "name": "id", 
+            "type": "int" 
+          },
+          {
+            "name": "login", 
+            "type": "string" 
+          }
+        ]
+     }
+JSON;
+
+        $reader = new AvroIODatumReader();
+        $written = new AvroStringIO();
+        $encoder = new AvroIOBinaryEncoder($written);
+        $writer = new AvroIODatumWriter();
+        $writer->write_data(AvroSchema::parse($writers_schema), $record, $encoder);
+        $decoder = new AvroIOBinaryDecoder(new AvroStringIO((string)$written));
+        $this->assertEquals(
+            $expectedRecord,
+            $reader->read_data(
+                AvroSchema::parse($writers_schema),
+                AvroSchema::parse($readers_schema),
+                $decoder
+            ));
+    }
 }
